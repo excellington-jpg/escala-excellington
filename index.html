@@ -1,0 +1,1586 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escala Mensal de Trabalho Permanente</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Biblioteca para geração direta de PDF no navegador -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 4mm;
+    }
+    @media print {
+      .no-print { display: none !important; }
+      body { background-color: white !important; font-size: 8px; padding: 0 !important; margin: 0 !important; }
+      .container-box { box-shadow: none !important; border: 1px solid #cbd5e1 !important; width: 100% !important; max-width: 100% !important; }
+      #printableScaleArea { width: 100% !important; max-width: 100% !important; }
+      table { font-size: 7.5px !important; width: 100% !important; table-layout: auto !important; }
+      th, td { padding: 1px 0.5px !important; font-size: 7.5px !important; }
+      .day-badge { width: 18px !important; height: 18px !important; font-size: 8px !important; }
+    }
+
+    /* Estilos das Formas Geométricas para as Jornadas */
+    .shape-j1 {
+      border-radius: 2px; /* Quadrado */
+    }
+    .shape-j2 {
+      border-radius: 50%; /* Círculo */
+    }
+    .shape-j3 {
+      clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); /* Hexágono */
+      border-radius: 0 !important;
+    }
+    .shape-j4 {
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); /* Estrela */
+      border-radius: 0 !important;
+    }
+
+    /* Estilo otimizado para o gerador de PDF */
+    .pdf-render-mode {
+      width: 1050px !important;
+      max-width: 1050px !important;
+      background: white !important;
+      padding: 6px !important;
+      box-sizing: border-box !important;
+    }
+    .pdf-render-mode table {
+      width: 100% !important;
+      font-size: 7.5px !important;
+    }
+    .pdf-render-mode th, .pdf-render-mode td {
+      padding: 1px 0.5px !important;
+      font-size: 7.5px !important;
+    }
+    .pdf-render-mode .day-badge {
+      width: 17px !important;
+      height: 17px !important;
+      font-size: 8px !important;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen font-sans pb-12">
+
+  <!-- Header principal -->
+  <header class="bg-slate-900 text-white shadow-lg no-print">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div class="p-2 bg-indigo-600 rounded-lg">
+          <i data-lucide="calendar" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold">Gerador de Escala Permanente</h1>
+          <p class="text-xs text-slate-400">Escalas contínuas com ciclos customizáveis e múltiplas jornadas</p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button onclick="exportToCSV()" type="button" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-3 py-2 rounded-md transition shadow cursor-pointer font-medium">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Exportar CSV
+        </button>
+        <button onclick="triggerPrintPDF()" type="button" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-2 rounded-md transition shadow cursor-pointer font-medium">
+          <i data-lucide="printer" class="w-4 h-4"></i> Imprimir / Salvar PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-2 sm:px-4 mt-6">
+
+    <!-- Painel de Controles e Configuração (Oculto na Impressão) -->
+    <div class="no-print grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      
+      <!-- Dados da Unidade, Período e Observações -->
+      <div class="bg-white p-5 rounded-xl shadow-md border border-slate-200 space-y-3">
+        <h2 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+          <i data-lucide="building" class="w-4 h-4 text-indigo-600"></i>
+          Unidade e Período
+        </h2>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Nome da Unidade / Setor</label>
+          <input type="text" id="unitName" value="Unidade Operacional Central - Setor A" oninput="renderScale(); autoSaveCurrentData()" class="w-full text-sm border border-slate-300 rounded-md p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Mês</label>
+            <select id="selectMonth" onchange="changeMonthYear()" class="w-full text-sm border border-slate-300 rounded-md p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+              <option value="0">Janeiro</option>
+              <option value="1">Fevereiro</option>
+              <option value="2">Março</option>
+              <option value="3">Abril</option>
+              <option value="4">Maio</option>
+              <option value="5">Junho</option>
+              <option value="6">Julho</option>
+              <option value="7">Agosto</option>
+              <option value="8">Setembro</option>
+              <option value="9">Outubro</option>
+              <option value="10">Novembro</option>
+              <option value="11">Dezembro</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Ano</label>
+            <input type="number" id="selectYear" min="2020" max="2100" value="2026" onchange="changeMonthYear()" class="w-full text-sm border border-slate-300 rounded-md p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+        <div class="flex items-center justify-between pt-1">
+          <button onclick="navigateMonth(-1)" type="button" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded flex items-center gap-1 border">
+            <i data-lucide="chevron-left" class="w-3 h-3"></i> Mês Anterior
+          </button>
+          <button onclick="navigateMonth(1)" type="button" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded flex items-center gap-1 border">
+            Próximo Mês <i data-lucide="chevron-right" class="w-3 h-3"></i>
+          </button>
+        </div>
+
+        <div class="border-t border-slate-200 pt-2">
+          <label class="block text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
+            <i data-lucide="message-square" class="w-3.5 h-3.5 text-indigo-600"></i> Observações da Escala
+          </label>
+          <textarea id="scaleNotes" rows="2" oninput="renderScale(); autoSaveCurrentData()" placeholder="Ex: Alterações de folgas autorizadas pela gerência. Plantão especial no feriado." class="w-full text-xs border border-slate-300 rounded-md p-2 outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+        <div class="border-t border-slate-200 pt-3 mt-1">
+          <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <i data-lucide="save" class="w-3.5 h-3.5 text-indigo-600"></i> Escalas Criadas
+          </label>
+          <p class="text-[10px] text-slate-500 mb-2">Salve os parâmetros desta escala para reutilizá-los em outros meses.</p>
+          <div class="flex gap-1.5">
+            <select id="savedScaleSelect" class="flex-1 min-w-0 text-xs border border-slate-300 rounded-md p-2 bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">Selecione uma escala salva...</option>
+            </select>
+            <button onclick="loadSavedScale()" type="button" title="Carregar escala" class="px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md"><i data-lucide="folder-open" class="w-3.5 h-3.5"></i></button>
+            <button onclick="deleteSavedScale()" type="button" title="Excluir escala salva" class="px-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5 mt-1.5">
+            <button onclick="saveCurrentScale()" type="button" class="text-[11px] bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-2 py-1.5 rounded-md flex items-center justify-center gap-1"><i data-lucide="save" class="w-3.5 h-3.5"></i> Salvar como nova</button>
+            <button onclick="createNextMonthScale()" type="button" class="text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-2 py-1.5 rounded-md flex items-center justify-center gap-1"><i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i> Próximo mês</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gestão de Funcionários -->
+      <div class="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-base font-semibold text-slate-700 flex items-center gap-2">
+            <i data-lucide="users" class="w-4 h-4 text-indigo-600"></i>
+            Equipe (<span id="empCount">0</span>/10)
+          </h2>
+          <div class="flex gap-1">
+            <button onclick="openImportModal()" type="button" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium px-2.5 py-1 rounded border border-indigo-200 flex items-center gap-1">
+              <i data-lucide="upload" class="w-3 h-3"></i> Importar (3 Colunas)
+            </button>
+            <button onclick="openEmpModal()" type="button" class="text-xs bg-slate-800 hover:bg-slate-900 text-white font-medium px-2.5 py-1 rounded flex items-center gap-1">
+              <i data-lucide="plus" class="w-3 h-3"></i> Novo
+            </button>
+          </div>
+        </div>
+        <div id="empListMini" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+          <!-- Lista dinâmica de empregados montada via JS -->
+        </div>
+      </div>
+
+      <!-- Legendas e Códigos rápidos -->
+      <div class="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+        <h2 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
+          <i data-lucide="info" class="w-4 h-4 text-indigo-600"></i>
+          Legenda de Ocorrências
+        </h2>
+        <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+          <div class="flex items-center gap-1.5"><span class="w-4 h-4 flex items-center justify-center font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[9px]">N</span> Normal</div>
+          <div class="flex items-center gap-1.5"><span class="w-4 h-4 flex items-center justify-center font-bold bg-slate-200 text-slate-700 border border-slate-300 rounded text-[9px]">F</span> Folga</div>
+          <div class="flex items-center gap-1.5"><span class="w-4 h-4 flex items-center justify-center font-bold bg-red-100 text-red-800 border border-red-300 rounded text-[9px]">AF</span> Afastamento</div>
+          <div class="flex items-center gap-1.5"><span class="w-4 h-4 flex items-center justify-center font-bold bg-amber-100 text-amber-800 border border-amber-300 rounded text-[9px]">FE</span> Férias</div>
+          <div class="flex items-center gap-1.5"><span class="w-4 h-4 flex items-center justify-center font-bold bg-blue-100 text-blue-800 border border-blue-300 rounded text-[9px]">FL</span> Folga Lib.</div>
+          <div class="flex items-center gap-1.5"><span class="w-4 h-4 flex items-center justify-center font-bold bg-purple-100 text-purple-800 border border-purple-300 rounded text-[9px]">LB</span> Liberalidade</div>
+        </div>
+
+        <!-- Legenda Visual das Formas das Jornadas -->
+        <div class="border-t border-slate-200 mt-2.5 pt-2">
+          <span class="block text-[11px] font-bold text-slate-700 mb-1">Formas das Jornadas:</span>
+          <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
+            <div class="flex items-center gap-1.5"><span class="w-4 h-4 bg-indigo-600 text-white flex items-center justify-center text-[8px] shape-j1 font-bold">J1</span> Jornada 1 (Quadrado)</div>
+            <div class="flex items-center gap-1.5"><span class="w-4 h-4 bg-indigo-600 text-white flex items-center justify-center text-[8px] shape-j2 font-bold">J2</span> Jornada 2 (Círculo)</div>
+            <div class="flex items-center gap-1.5"><span class="w-4 h-4 bg-indigo-600 text-white flex items-center justify-center text-[8px] shape-j3 font-bold">J3</span> Jornada 3 (Hexágono)</div>
+            <div class="flex items-center gap-1.5"><span class="w-4 h-4 bg-indigo-600 text-white flex items-center justify-center text-[8px] shape-j4 font-bold">J4</span> Jornada 4 (Estrela)</div>
+          </div>
+        </div>
+
+        <p class="text-[10px] text-slate-400 mt-2">Dica: Clique em qualquer célula da escala para alterar individualmente o status e a jornada do dia.</p>
+      </div>
+
+    </div>
+
+    <!-- Tabela da Escala Principal -->
+    <div id="printableScaleArea" class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden container-box">
+      
+      <!-- Cabeçalho da Tabela -->
+      <div class="p-3 sm:p-4 bg-slate-50 border-b border-slate-200">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+          <div>
+            <h2 id="displayUnitName" class="text-base sm:text-lg font-bold text-slate-800 uppercase tracking-wide">
+              Unidade Operacional Central - Setor A
+            </h2>
+            <p class="text-xs text-slate-500 font-medium">ESCALA MENSAL DE TRABALHO</p>
+          </div>
+          <div class="text-left md:text-right">
+            <span id="displayMonthYear" class="text-sm sm:text-base font-bold text-indigo-700 uppercase bg-indigo-50 px-3 py-1 rounded-md border border-indigo-100 inline-block">
+              AGOSTO DE 2026
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Container da Tabela Responsiva com Scroll -->
+      <div class="overflow-x-auto custom-scrollbar">
+        <table id="scaleTable" class="w-full text-center border-collapse">
+          <!-- Renderizado dinamicamente pelo JS -->
+        </table>
+      </div>
+
+      <!-- Rodapé com estatísticas rápidas e Legendas Detalhadas -->
+      <div class="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-700 space-y-2">
+        <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 pb-2">
+          <div>Total de Colaboradores na Escala: <strong id="totalEmps">0</strong></div>
+          
+          <!-- Legendas de Alterações/Ocorrências -->
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]" id="scaleLegendFooter">
+            <!-- Gerado Dinamicamente com todos os códigos utilizados -->
+          </div>
+        </div>
+
+        <!-- Seção de Observações -->
+        <div id="displayScaleNotesContainer" class="hidden text-xs text-slate-600 bg-amber-50/70 border border-amber-200/60 rounded-md p-2">
+          <strong class="text-amber-900">Observações:</strong>
+          <span id="displayScaleNotes" class="ml-1 text-slate-800 whitespace-pre-wrap"></span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: Adicionar / Editar Empregado -->
+  <div id="empModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4 no-print overflow-y-auto">
+    <div class="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 my-8">
+      <div class="bg-slate-900 text-white px-5 py-4 flex justify-between items-center">
+        <h3 id="empModalTitle" class="font-bold text-base flex items-center gap-2">
+          <i data-lucide="user-plus" class="w-5 h-5"></i> Cadastrar Empregado
+        </h3>
+        <button onclick="closeEmpModal()" type="button" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form id="empForm" onsubmit="saveEmployee(event)" class="p-5 space-y-4">
+        <input type="hidden" id="empId">
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Matrícula / Identificador</label>
+            <input type="text" id="empCode" required placeholder="Ex: EMP_1" class="w-full text-sm border border-slate-300 rounded p-2 outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Nome Completo</label>
+            <input type="text" id="empName" required placeholder="Ex: João da Silva" class="w-full text-sm border border-slate-300 rounded p-2 outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Função / Cargo</label>
+          <input type="text" id="empRole" placeholder="Ex: Operador de Sistemas" class="w-full text-sm border border-slate-300 rounded p-2 outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Definição de Múltiplas Jornadas (Até 4 Jornadas Distintas) -->
+        <div class="border-t border-slate-200 pt-3">
+          <div class="flex justify-between items-center mb-2">
+            <h4 class="text-xs font-bold text-slate-700 uppercase">Jornadas de Trabalho (Até 4 Distintas)</h4>
+            <button onclick="addJornadaSlot()" type="button" class="text-[11px] text-indigo-600 hover:underline font-semibold flex items-center gap-1">
+              <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Adicionar Jornada
+            </button>
+          </div>
+          <p class="text-[10px] text-slate-500 mb-2">A Jornada 1 é a padrão (Quadrado). As demais podem ser alternadas por dia conforme necessidade.</p>
+          
+          <div id="jornadasContainer" class="space-y-2 max-h-44 overflow-y-auto pr-1">
+            <!-- Preenchido via JS -->
+          </div>
+        </div>
+
+        <!-- Configuração Unificada de Ciclos Múltiplos (1 a 6 subciclos) -->
+        <div class="border-t border-slate-200 pt-3">
+          <div class="mb-2">
+            <h4 class="text-xs font-bold text-slate-700 uppercase">Sequência do Ciclo de Escala</h4>
+            <p class="text-[10px] text-slate-500">Informe até 6 subciclos no formato Trabalho(N) x Folga(F). Exemplos: <span class="font-mono text-indigo-600">6x2</span> ou <span class="font-mono text-indigo-600">4x2 4x1 5x3 1x1 3x2 2x1</span></p>
+          </div>
+
+          <div class="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div class="grid grid-cols-2 gap-2 mb-1">
+              <div>
+                <label class="block text-[11px] text-slate-500 font-medium">Data de Início da Sequência</label>
+                <input type="date" id="empMultiCycleStartDate" required class="w-full text-xs border border-slate-300 rounded p-1.5 bg-white">
+              </div>
+              <div class="flex items-end">
+                <span id="totalCycleDays" class="text-[11px] text-indigo-700 font-bold bg-indigo-50 border border-indigo-200 px-2 py-1.5 rounded w-full text-center">
+                  Total da Sequência: 0 dias
+                </span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2" id="multiCycleInputs">
+              <div>
+                <label class="block text-[10px] text-slate-500">Ciclo 1 (Ex: 6x2)</label>
+                <input type="text" id="cycleSub1" placeholder="6x2" oninput="calculateMultiCycleTotal()" class="w-full text-xs border border-slate-300 rounded p-1.5 text-center font-mono uppercase bg-white">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500">Ciclo 2 (Opcional)</label>
+                <input type="text" id="cycleSub2" placeholder="4x1" oninput="calculateMultiCycleTotal()" class="w-full text-xs border border-slate-300 rounded p-1.5 text-center font-mono uppercase bg-white">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500">Ciclo 3 (Opcional)</label>
+                <input type="text" id="cycleSub3" placeholder="5x3" oninput="calculateMultiCycleTotal()" class="w-full text-xs border border-slate-300 rounded p-1.5 text-center font-mono uppercase bg-white">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500">Ciclo 4 (Opcional)</label>
+                <input type="text" id="cycleSub4" placeholder="1x1" oninput="calculateMultiCycleTotal()" class="w-full text-xs border border-slate-300 rounded p-1.5 text-center font-mono uppercase bg-white">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500">Ciclo 5 (Opcional)</label>
+                <input type="text" id="cycleSub5" placeholder="3x2" oninput="calculateMultiCycleTotal()" class="w-full text-xs border border-slate-300 rounded p-1.5 text-center font-mono uppercase bg-white">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500">Ciclo 6 (Opcional)</label>
+                <input type="text" id="cycleSub6" placeholder="2x1" oninput="calculateMultiCycleTotal()" class="w-full text-xs border border-slate-300 rounded p-1.5 text-center font-mono uppercase bg-white">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <button type="button" onclick="closeEmpModal()" class="px-4 py-2 text-xs bg-slate-200 text-slate-700 rounded hover:bg-slate-300 font-medium">Cancelar</button>
+          <button type="submit" class="px-4 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 font-medium">Salvar Empregado</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Importar de Planilha -->
+  <div id="importModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4 no-print">
+    <div class="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200">
+      <div class="bg-slate-900 text-white px-5 py-4 flex justify-between items-center">
+        <h3 class="font-bold text-base flex items-center gap-2">
+          <i data-lucide="file-up" class="w-5 h-5"></i> Importar Colaboradores da Planilha
+        </h3>
+        <button onclick="closeImportModal()" type="button" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-xs text-indigo-900">
+          <p class="font-bold mb-1">Estrutura Simplificada (3 Colunas):</p>
+          <p>Cole abaixo as colunas do seu Excel/Google Sheets contendo exatamente:</p>
+          <code class="block bg-white p-2 rounded border border-indigo-200 font-mono text-[11px] mt-1 text-slate-700">MATRÍCULA ; NOME ; CARGO/FUNÇÃO</code>
+          <p class="text-[10px] text-slate-500 mt-1">* Suporta delimitadores por Ponto e Vírgula (;), Tabulação (Tab) ou Vírgula (,).</p>
+        </div>
+
+        <textarea id="importRawText" rows="6" placeholder="EMP_1; Carlos Eduardo Silva; Técnico Operacional&#10;EMP_2; Ana Maria Souza; Supervisora de Turno&#10;EMP_3; Roberto Ramos; Analista de Manutenção" class="w-full text-xs border border-slate-300 rounded p-2.5 font-mono outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        
+        <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+          <button onclick="loadSampleData()" type="button" class="text-xs text-indigo-600 hover:underline font-medium">Carregar Exemplo Padrão (10 Empregados)</button>
+          <div class="flex gap-2">
+            <button onclick="closeImportModal()" type="button" class="px-4 py-2 text-xs bg-slate-200 text-slate-700 rounded hover:bg-slate-300 font-medium">Cancelar</button>
+            <button onclick="processImport()" type="button" class="px-4 py-2 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 font-medium">Importar Dados</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Exportar CSV / Visualização para Copiar -->
+  <div id="csvExportModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4 no-print">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200">
+      <div class="bg-emerald-700 text-white px-5 py-4 flex justify-between items-center">
+        <h3 class="font-bold text-base flex items-center gap-2">
+          <i data-lucide="file-spreadsheet" class="w-5 h-5"></i> Dados da Escala em CSV
+        </h3>
+        <button onclick="closeCSVModal()" type="button" class="text-emerald-100 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-5 space-y-3">
+        <p class="text-xs text-slate-600">
+          Caso o download automático não inicie por restrições do seu navegador, você pode copiar os dados abaixo e colar diretamente no <strong>Microsoft Excel</strong> ou <strong>Google Sheets</strong>:
+        </p>
+        <textarea id="csvTextArea" rows="10" readonly class="w-full text-[11px] font-mono border border-slate-300 bg-slate-50 rounded p-3 text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+
+        <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+          <span id="csvCopyStatus" class="text-xs text-emerald-600 font-bold hidden flex items-center gap-1">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i> Dados copiados com sucesso!
+          </span>
+          <div class="flex gap-2 ml-auto">
+            <button onclick="closeCSVModal()" type="button" class="px-4 py-2 text-xs bg-slate-200 text-slate-700 rounded hover:bg-slate-300 font-medium">Fechar</button>
+            <button onclick="copyCSVToClipboard()" type="button" class="px-4 py-2 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 font-medium flex items-center gap-1.5">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copiar CSV
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Opções de Impressão e Download de PDF -->
+  <div id="printPdfModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4 no-print">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+      <div class="bg-indigo-900 text-white px-5 py-4 flex justify-between items-center">
+        <h3 class="font-bold text-base flex items-center gap-2">
+          <i data-lucide="file-text" class="w-5 h-5"></i> Gerar PDF / Imprimir Escala
+        </h3>
+        <button onclick="closePrintPdfModal()" type="button" class="text-indigo-200 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-5 space-y-4">
+        <p class="text-xs text-slate-600">Escolha o método desejado para exportar ou imprimir sua escala mensal:</p>
+        
+        <div class="space-y-2">
+          <button onclick="downloadDirectPDF()" type="button" class="w-full p-3 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-left flex items-center justify-between group transition">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-indigo-600 text-white rounded-md"><i data-lucide="download" class="w-5 h-5"></i></div>
+              <div>
+                <div class="text-xs font-bold text-indigo-950">Baixar PDF Direto (Paisagem A4)</div>
+                <div class="text-[11px] text-slate-500">Ajustado para caber todos os 31 dias sem cortes</div>
+              </div>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-indigo-400 group-hover:translate-x-1 transition-transform"></i>
+          </button>
+
+          <button onclick="openPrintWindow()" type="button" class="w-full p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-left flex items-center justify-between group transition">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-slate-700 text-white rounded-md"><i data-lucide="printer" class="w-5 h-5"></i></div>
+              <div>
+                <div class="text-xs font-bold text-slate-800">Abrir em Nova Aba (Impressão do Navegador)</div>
+                <div class="text-[11px] text-slate-500">Abre a escala em tela cheia para salvar via Ctrl+P</div>
+              </div>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform"></i>
+          </button>
+        </div>
+
+        <div class="flex justify-end pt-2 border-t border-slate-100">
+          <button onclick="closePrintPdfModal()" type="button" class="px-4 py-1.5 text-xs bg-slate-200 text-slate-700 rounded hover:bg-slate-300 font-medium">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Confirmar Exclusão -->
+  <div id="confirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4 no-print">
+    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 border border-slate-200 space-y-4">
+      <div class="flex items-center gap-3 text-red-600">
+        <div class="p-2 bg-red-100 rounded-full"><i data-lucide="alert-triangle" class="w-6 h-6"></i></div>
+        <h3 id="confirmTitle" class="font-bold text-base text-slate-800">Confirmar Ação</h3>
+      </div>
+      <p id="confirmMessage" class="text-xs text-slate-600">Deseja realmente remover este colaborador da escala?</p>
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeConfirmModal(false)" type="button" class="px-4 py-1.5 text-xs bg-slate-200 text-slate-700 rounded hover:bg-slate-300 font-medium">Cancelar</button>
+        <button id="confirmActionButton" onclick="closeConfirmModal(true)" type="button" class="px-4 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700 font-medium">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Mensagem Genérica / Alerta -->
+  <div id="alertModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4 no-print">
+    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 border border-slate-200 space-y-4">
+      <div class="flex items-center gap-3 text-indigo-600">
+        <div class="p-2 bg-indigo-100 rounded-full"><i data-lucide="info" class="w-6 h-6"></i></div>
+        <h3 id="alertTitle" class="font-bold text-base text-slate-800">Aviso</h3>
+      </div>
+      <p id="alertMessage" class="text-xs text-slate-600"></p>
+      <div class="flex justify-end pt-2 border-t border-slate-100">
+        <button onclick="closeAlertModal()" type="button" class="px-4 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 font-medium">Entendido</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Alterar Dia Individual / Jornada -->
+  <div id="cellModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4 no-print">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+      <div class="bg-slate-800 text-white px-4 py-3 flex justify-between items-center">
+        <div>
+          <h3 id="cellModalTitle" class="font-bold text-sm">Alterar Dia do Empregado</h3>
+          <p id="cellModalSubtitle" class="text-[11px] text-slate-300">Selecione o status e a jornada</p>
+        </div>
+        <button onclick="closeCellModal()" type="button" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="p-4 space-y-3 max-h-[75vh] overflow-y-auto">
+        <input type="hidden" id="cellEmpId">
+        <input type="hidden" id="cellDateStr">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Selecionar Jornada para este dia:</label>
+          <select id="cellJornadaSelect" class="w-full text-xs border border-slate-300 rounded p-2 bg-slate-50 font-medium">
+            <!-- Preenchido dinamicamente -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Ocorrência / Status do Dia:</label>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button onclick="updateDayStatus('N')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-emerald-50 text-xs font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-emerald-100 text-emerald-800 border rounded flex items-center justify-center font-bold">N</span> Normal</span>
+            </button>
+            <button onclick="updateDayStatus('F')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-slate-100 text-xs font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-slate-200 text-slate-700 border rounded flex items-center justify-center font-bold">F</span> Folga</span>
+            </button>
+            <button onclick="updateDayStatus('AF')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-red-50 text-xs font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-red-100 text-red-800 border rounded flex items-center justify-center font-bold">AF</span> Afastamento</span>
+            </button>
+            <button onclick="updateDayStatus('FE')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-amber-50 text-xs font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-amber-100 text-amber-800 border rounded flex items-center justify-center font-bold">FE</span> Férias</span>
+            </button>
+            <button onclick="updateDayStatus('FL')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-blue-50 text-xs font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-blue-100 text-blue-800 border rounded flex items-center justify-center font-bold">FL</span> Folga Liberada</span>
+            </button>
+            <button onclick="updateDayStatus('LB')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-purple-50 text-xs font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-purple-100 text-purple-800 border rounded flex items-center justify-center font-bold">LB</span> Liberalidade</span>
+            </button>
+            <button onclick="updateDayStatus('HE')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-orange-50 text-xs font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-orange-100 text-orange-800 border rounded flex items-center justify-center font-bold">HE</span> Hora Extra</span>
+            </button>
+            <button onclick="updateDayStatus('FF')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-teal-50 text-xs font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-teal-100 text-teal-800 border rounded flex items-center justify-center font-bold">FF</span> Folga Feriado</span>
+            </button>
+            <button onclick="updateDayStatus('FC')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-cyan-50 text-xs font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-cyan-100 text-cyan-800 border rounded flex items-center justify-center font-bold">FC</span> Folga Conform.</span>
+            </button>
+            <button onclick="updateDayStatus('NP')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-indigo-50 text-xs font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-indigo-100 text-indigo-800 border rounded flex items-center justify-center font-bold">NP</span> Normal Plantão</span>
+            </button>
+            <button onclick="updateDayStatus('FP')" type="button" class="text-left p-2 rounded flex items-center justify-between border hover:bg-rose-50 text-xs font-semibold col-span-2">
+              <span class="flex items-center gap-1.5"><span class="w-5 h-5 bg-rose-100 text-rose-800 border rounded flex items-center justify-center font-bold">FP</span> Folga Plantão</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Estado global do aplicativo
+    let currentYear = 2026;
+    let currentMonth = 7; // Agosto (0 = Jan)
+    let employees = [];
+    let customOverrides = {}; // Registro de substituições de dias individuais: { "EMP_1_2026-08-15": { status: "N", jornadaIdx: 1 } }
+    let confirmCallback = null;
+
+    // Persistência local e modelos de escalas criadas
+    const STORAGE_CURRENT = 'geradorEscalaPermanent_current_v1';
+    const STORAGE_SCALES = 'geradorEscalaPermanent_scales_v1';
+    let savedScales = [];
+
+    function cloneData(data) {
+      return JSON.parse(JSON.stringify(data));
+    }
+
+    function getCurrentScaleData() {
+      return {
+        unitName: document.getElementById('unitName').value || '',
+        scaleNotes: document.getElementById('scaleNotes').value || '',
+        employees: cloneData(employees),
+        customOverrides: cloneData(customOverrides),
+        scaleYear: currentYear,
+        scaleMonth: currentMonth
+      };
+    }
+
+    function autoSaveCurrentData() {
+      try { localStorage.setItem(STORAGE_CURRENT, JSON.stringify(getCurrentScaleData())); }
+      catch (err) { console.warn('Não foi possível salvar os dados locais.', err); }
+    }
+
+    function loadCurrentData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_CURRENT);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.employees)) return false;
+        employees = data.employees;
+        customOverrides = data.customOverrides || {};
+        document.getElementById('unitName').value = data.unitName || '';
+        document.getElementById('scaleNotes').value = data.scaleNotes || '';
+        return true;
+      } catch (err) { return false; }
+    }
+
+    function loadSavedScalesList() {
+      try {
+        savedScales = JSON.parse(localStorage.getItem(STORAGE_SCALES) || '[]');
+        if (!Array.isArray(savedScales)) savedScales = [];
+      } catch (err) { savedScales = []; }
+      const select = document.getElementById('savedScaleSelect');
+      if (!select) return;
+      select.innerHTML = '<option value="">Selecione uma escala salva...</option>';
+      savedScales.forEach((scale, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = `${scale.name}${scale.savedAt ? ' — ' + scale.savedAt : ''}`;
+        select.appendChild(option);
+      });
+    }
+
+    function saveCurrentScale() {
+      const name = prompt('Digite um nome para esta escala:', `Escala ${monthNames[currentMonth]} ${currentYear}`);
+      if (name === null) return;
+      const cleanName = name.trim();
+      if (!cleanName) return showAlert('Nome obrigatório', 'Informe um nome para identificar a escala salva.');
+
+      const existingIndex = savedScales.findIndex(s => s.name.toLowerCase() === cleanName.toLowerCase());
+      const scale = {
+        id: existingIndex >= 0 ? savedScales[existingIndex].id : `scale_${Date.now()}`,
+        name: cleanName,
+        savedAt: new Date().toLocaleDateString('pt-BR'),
+        data: getCurrentScaleData()
+      };
+      if (existingIndex >= 0) savedScales[existingIndex] = scale;
+      else savedScales.push(scale);
+
+      try {
+        localStorage.setItem(STORAGE_SCALES, JSON.stringify(savedScales));
+        loadSavedScalesList();
+        document.getElementById('savedScaleSelect').value = String(existingIndex >= 0 ? existingIndex : savedScales.length - 1);
+        showAlert('Escala salva', `A escala "${cleanName}" foi salva com os parâmetros dos empregados, jornadas e ciclos.`);
+      } catch (err) {
+        showAlert('Não foi possível salvar', 'O navegador não permitiu gravar esta escala no armazenamento local.');
+      }
+    }
+
+    function loadSavedScale() {
+      const index = parseInt(document.getElementById('savedScaleSelect').value);
+      if (isNaN(index) || !savedScales[index]) return showAlert('Selecione uma escala', 'Escolha primeiro uma escala na lista "Escalas Criadas".');
+      const scale = savedScales[index];
+      const savedYear = Number(scale.data.scaleYear);
+      const savedMonth = Number(scale.data.scaleMonth);
+      const hasSavedPeriod = Number.isInteger(savedYear) && Number.isInteger(savedMonth) && savedMonth >= 0 && savedMonth <= 11;
+      const periodText = hasSavedPeriod ? ` (${monthNames[savedMonth]} ${savedYear})` : '';
+
+      showConfirm(
+        `Carregar a escala "${scale.name}"${periodText}? Os parâmetros atuais serão substituídos pelos parâmetros salvos e o período da escala será selecionado automaticamente.`,
+        function(confirmed) {
+          if (!confirmed) return;
+          const data = cloneData(scale.data);
+          employees = data.employees || [];
+          customOverrides = data.customOverrides || {};
+          document.getElementById('unitName').value = data.unitName || '';
+          document.getElementById('scaleNotes').value = data.scaleNotes || '';
+
+          // A escala é carregada no mesmo mês/ano em que foi salva.
+          if (hasSavedPeriod) {
+            currentYear = savedYear;
+            currentMonth = savedMonth;
+            document.getElementById('selectMonth').value = currentMonth;
+            document.getElementById('selectYear').value = currentYear;
+          }
+
+          autoSaveCurrentData();
+          renderScale();
+          showAlert('Escala carregada', `A escala "${scale.name}" foi carregada no período ${monthNames[currentMonth]} de ${currentYear}.`);
+        },
+        'Carregar Escala',
+        'Carregar',
+        'indigo'
+      );
+    }
+
+    function deleteSavedScale() {
+      const index = parseInt(document.getElementById('savedScaleSelect').value);
+      if (isNaN(index) || !savedScales[index]) return showAlert('Selecione uma escala', 'Escolha primeiro uma escala que deseja excluir.');
+      const scaleName = savedScales[index].name;
+      showConfirm(`Excluir definitivamente a escala salva "${scaleName}"?`, function(confirmed) {
+        if (!confirmed) return;
+        savedScales.splice(index, 1);
+        localStorage.setItem(STORAGE_SCALES, JSON.stringify(savedScales));
+        loadSavedScalesList();
+        showAlert('Escala excluída', `A escala "${scaleName}" foi removida da lista.`);
+      });
+    }
+
+    function createNextMonthScale() {
+      const next = new Date(currentYear, currentMonth + 1, 1);
+      currentYear = next.getFullYear();
+      currentMonth = next.getMonth();
+      document.getElementById('selectMonth').value = currentMonth;
+      document.getElementById('selectYear').value = currentYear;
+      // O próximo mês não copia alterações manuais: a sequência cadastrada é recalculada.
+      customOverrides = {};
+      autoSaveCurrentData();
+      renderScale();
+      showAlert('Próxima escala criada', `A escala de ${monthNames[currentMonth]} de ${currentYear} foi calculada com base na sequência cadastrada de cada empregado.`);
+    }
+
+    // Mapeamento de estilização e descrição das siglas
+    const statusInfo = {
+      'N':  { name: 'Normal', style: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold' },
+      'F':  { name: 'Folga', style: 'bg-slate-200 text-slate-600 border-slate-300' },
+      'AF': { name: 'Afastamento', style: 'bg-red-100 text-red-800 border-red-300 font-bold' },
+      'FE': { name: 'Férias', style: 'bg-amber-100 text-amber-800 border-amber-300 font-bold' },
+      'FL': { name: 'Folga Liberada', style: 'bg-blue-100 text-blue-800 border-blue-300 font-bold' },
+      'LB': { name: 'Liberalidade', style: 'bg-purple-100 text-purple-800 border-purple-300 font-bold' },
+      'HE': { name: 'Hora Extra', style: 'bg-orange-100 text-orange-800 border-orange-300 font-bold' },
+      'FF': { name: 'Folga Feriado', style: 'bg-teal-100 text-teal-800 border-teal-300 font-bold' },
+      'FC': { name: 'Folga Conformidade', style: 'bg-cyan-100 text-cyan-800 border-cyan-300 font-bold' },
+      'NP': { name: 'Normal Plantão', style: 'bg-indigo-100 text-indigo-800 border-indigo-300 font-bold' },
+      'FP': { name: 'Folga Plantão', style: 'bg-rose-100 text-rose-800 border-rose-300 font-bold' }
+    };
+
+    const monthNames = [
+      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ];
+
+    const weekDaysShort = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+    // Retorna a classe da forma da jornada
+    function getJornadaShapeClass(jornadaIdx) {
+      switch (parseInt(jornadaIdx) || 0) {
+        case 1: return 'shape-j2'; // Jornada 2: Círculo
+        case 2: return 'shape-j3'; // Jornada 3: Hexágono
+        case 3: return 'shape-j4'; // Jornada 4: Estrela
+        case 0:
+        default: return 'shape-j1'; // Jornada 1: Quadrado
+      }
+    }
+
+    // Inicialização da Aplicação
+    window.onload = function() {
+      lucide.createIcons();
+      document.getElementById('selectMonth').value = currentMonth;
+      document.getElementById('selectYear').value = currentYear;
+
+      if (!loadCurrentData()) loadInitialEmployees();
+      loadSavedScalesList();
+      renderScale();
+      autoSaveCurrentData();
+    };
+
+    // Modais Customizados
+    function showAlert(title, message) {
+      document.getElementById('alertTitle').innerText = title || "Aviso";
+      document.getElementById('alertMessage').innerText = message || "";
+      document.getElementById('alertModal').classList.remove('hidden');
+    }
+
+    function closeAlertModal() {
+      document.getElementById('alertModal').classList.add('hidden');
+    }
+
+    function showConfirm(message, callback, title = 'Confirmar Ação', actionText = 'Confirmar', actionColor = 'red') {
+      document.getElementById('confirmTitle').innerText = title;
+      document.getElementById('confirmMessage').innerText = message;
+      const actionButton = document.getElementById('confirmActionButton');
+      actionButton.innerText = actionText;
+      actionButton.className = `px-4 py-1.5 text-xs text-white rounded font-medium ${actionColor === 'indigo' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-red-600 hover:bg-red-700'}`;
+      confirmCallback = callback;
+      document.getElementById('confirmModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeConfirmModal(result) {
+      document.getElementById('confirmModal').classList.add('hidden');
+      if (confirmCallback) {
+        confirmCallback(result);
+        confirmCallback = null;
+      }
+    }
+
+    // Dados iniciais padrão (EMP_1 até EMP_10) com suporte a até 4 jornadas
+    function loadInitialEmployees() {
+      const defaultStart = "2026-08-01";
+      employees = [
+        { 
+          id: "EMP_1", code: "EMP_1", name: "Carlos Eduardo Silva", role: "Técnico Operacional", 
+          jornadas: [
+            { start: "07:00", lunchStart: "11:00", lunchEnd: "13:00", end: "17:00", duration: "8h" },
+            { start: "13:00", lunchStart: "17:00", lunchEnd: "18:00", end: "22:00", duration: "8h" }
+          ], 
+          multiCycles: ["4x2", "4x1", "5x3", "1x1", "3x2", "2x1"], cycleStartDate: defaultStart 
+        },
+        { 
+          id: "EMP_2", code: "EMP_2", name: "Ana Maria Souza", role: "Supervisora de Turno", 
+          jornadas: [{ start: "07:00", lunchStart: "11:00", lunchEnd: "13:00", end: "17:00", duration: "8h" }], 
+          multiCycles: ["6x2"], cycleStartDate: defaultStart 
+        },
+        { 
+          id: "EMP_3", code: "EMP_3", name: "Roberto Ramos", role: "Analista de Manutenção", 
+          jornadas: [{ start: "08:00", lunchStart: "12:00", lunchEnd: "13:00", end: "17:00", duration: "8h" }], 
+          multiCycles: ["5x2"], cycleStartDate: defaultStart 
+        },
+        { 
+          id: "EMP_4", code: "EMP_4", name: "Juliana Santos", role: "Assistente de Operações", 
+          jornadas: [{ start: "07:00", lunchStart: "11:00", lunchEnd: "12:00", end: "16:00", duration: "8h" }], 
+          multiCycles: ["4x1"], cycleStartDate: defaultStart 
+        },
+        { 
+          id: "EMP_5", code: "EMP_5", name: "Fernando Oliveira", role: "Inspetor de Qualidade", 
+          jornadas: [{ start: "07:00", lunchStart: "11:00", lunchEnd: "13:00", end: "17:00", duration: "8h" }], 
+          multiCycles: ["5x3"], cycleStartDate: defaultStart 
+        },
+        { 
+          id: "EMP_6", code: "EMP_6", name: "Patricia Lima", role: "Operadora Especializada", 
+          jornadas: [{ start: "07:00", lunchStart: "11:00", lunchEnd: "13:00", end: "17:00", duration: "8h" }], 
+          multiCycles: ["6x2"], cycleStartDate: defaultStart 
+        },
+        { 
+          id: "EMP_7", code: "EMP_7", name: "Lucas Mendes", role: "Técnico de Utilidades", 
+          jornadas: [{ start: "07:00", lunchStart: "11:00", lunchEnd: "13:00", end: "17:00", duration: "8h" }], 
+          multiCycles: ["12x36"], cycleStartDate: defaultStart 
+        },
+        { 
+          id: "EMP_8", code: "EMP_8", name: "Camila Ribeiro", role: "Assistente Administrativa", 
+          jornadas: [{ start: "08:00", lunchStart: "12:00", lunchEnd: "13:30", end: "17:30", duration: "8h" }], 
+          multiCycles: ["5x2"], cycleStartDate: defaultStart 
+        },
+        { 
+          id: "EMP_9", code: "EMP_9", name: "Gabriel Alves", role: "Operador de Máquinas", 
+          jornadas: [{ start: "07:00", lunchStart: "11:00", lunchEnd: "13:00", end: "17:00", duration: "8h" }], 
+          multiCycles: ["6x2"], cycleStartDate: defaultStart 
+        },
+        { 
+          id: "EMP_10", code: "EMP_10", name: "Beatriz Martins", role: "Líder de Equipe", 
+          jornadas: [{ start: "07:00", lunchStart: "11:00", lunchEnd: "13:00", end: "17:00", duration: "8h" }], 
+          multiCycles: ["6x2"], cycleStartDate: defaultStart 
+        }
+      ];
+    }
+
+    // Navegação de tempo
+    function changeMonthYear() {
+      currentMonth = parseInt(document.getElementById('selectMonth').value);
+      currentYear = parseInt(document.getElementById('selectYear').value);
+      renderScale();
+    }
+
+    function navigateMonth(direction) {
+      currentMonth += direction;
+      if (currentMonth < 0) {
+        currentMonth = 11;
+        currentYear--;
+      } else if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+      document.getElementById('selectMonth').value = currentMonth;
+      document.getElementById('selectYear').value = currentYear;
+      renderScale();
+    }
+
+    // Monta o vetor do ciclo unificado a partir dos subciclos
+    function buildCycleArray(emp) {
+      let patternArray = [];
+      if (emp.multiCycles && emp.multiCycles.length > 0) {
+        emp.multiCycles.forEach(sub => {
+          const parts = sub.toLowerCase().split('x');
+          if (parts.length === 2) {
+            const work = parseInt(parts[0]) || 0;
+            const off = parseInt(parts[1]) || 0;
+            for (let w = 0; w < work; w++) patternArray.push('N');
+            for (let o = 0; o < off; o++) patternArray.push('F');
+          }
+        });
+      }
+      return patternArray.length > 0 ? patternArray : ['N','N','N','N','N','N','F','F'];
+    }
+
+    // Obter dados do dia (Status e Jornada ativa)
+    function getDayDataForDate(emp, targetDate) {
+      const key = `${emp.id}_${formatDateISO(targetDate)}`;
+      if (customOverrides[key]) {
+        return customOverrides[key];
+      }
+
+      const startDate = new Date(emp.cycleStartDate + "T00:00:00");
+      const target = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+      
+      const diffTime = target - startDate;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      let status = 'F';
+      if (diffDays >= 0) {
+        const cycleArray = buildCycleArray(emp);
+        const dayInCycle = diffDays % cycleArray.length;
+        status = cycleArray[dayInCycle];
+      }
+
+      return { status, jornadaIdx: 0 }; // Padrão usa a primeira jornada cadastrada
+    }
+
+    function formatDateISO(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    // Formatador amigável da descrição da sequência de ciclos
+    function getCycleLabel(emp) {
+      if (emp.multiCycles && emp.multiCycles.length > 0) {
+        const clean = emp.multiCycles.filter(c => c.trim() !== "");
+        if (clean.length > 0) return clean.join(' ');
+      }
+      return '6x2';
+    }
+
+    // Renderizador da Tabela de Escala Otimizado
+    function renderScale() {
+      const unitName = document.getElementById('unitName').value;
+      document.getElementById('displayUnitName').innerText = unitName || "UNIDADE DE TRABALHO";
+      document.getElementById('displayMonthYear').innerText = `${monthNames[currentMonth]} DE ${currentYear}`;
+      document.getElementById('empCount').innerText = employees.length;
+      document.getElementById('totalEmps').innerText = employees.length;
+
+      renderMiniEmpList();
+
+      const table = document.getElementById('scaleTable');
+      table.innerHTML = "";
+
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const usedStatuses = new Set();
+
+      // CABEÇALHO 1: Números dos Dias
+      let theadHtml = `<thead class="bg-slate-800 text-white font-semibold text-xs border-b border-slate-300">`;
+      theadHtml += `<tr>`;
+      theadHtml += `<th class="p-1.5 border border-slate-700 text-left min-w-[140px]">EMPREGADO / FUNÇÃO</th>`;
+      theadHtml += `<th class="p-1.5 border border-slate-700 text-left min-w-[105px]">JORNADAS</th>`;
+      theadHtml += `<th class="p-1 border border-slate-700 min-w-[65px] text-center">CICLO</th>`;
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        theadHtml += `<th class="p-0.5 border border-slate-700 text-center text-[10px] sm:text-xs">${String(day).padStart(2, '0')}</th>`;
+      }
+      theadHtml += `<th class="p-0.5 border border-slate-700 text-center bg-slate-900 text-[10px] min-w-[28px]">TOT</th>`;
+      theadHtml += `</tr>`;
+
+      // CABEÇALHO 2: Dias da Semana
+      theadHtml += `<tr class="bg-slate-700 text-[10px] sm:text-[11px] text-slate-200">`;
+      theadHtml += `<th class="p-1 border border-slate-600 text-left" colspan="3">Dia da Semana →</th>`;
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(currentYear, currentMonth, day);
+        const dayOfWeek = weekDaysShort[date.getDay()];
+        const isWeekend = (date.getDay() === 0 || date.getDay() === 6);
+        const bgClass = isWeekend ? 'bg-amber-900/40 text-amber-200 font-bold' : '';
+        
+        theadHtml += `<th class="p-0.5 border border-slate-600 text-center ${bgClass}">${dayOfWeek}</th>`;
+      }
+      theadHtml += `<th class="p-0.5 border border-slate-600 bg-slate-800 text-center">D</th>`;
+      theadHtml += `</tr></thead>`;
+
+      table.innerHTML += theadHtml;
+
+      // CORPO DA TABELA
+      let tbodyHtml = `<tbody>`;
+
+      employees.forEach((emp, index) => {
+        const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+        tbodyHtml += `<tr class="${rowBg} hover:bg-indigo-50/40 transition text-xs border-b border-slate-200">`;
+        
+        // Empregado
+        tbodyHtml += `<td class="p-1 border border-slate-200 text-left leading-tight">
+          <div class="font-bold text-slate-800 text-[11px] truncate max-w-[140px]">${emp.code} - ${emp.name}</div>
+          <div class="text-[9px] text-slate-500 truncate max-w-[140px]">${emp.role || 'Sem cargo'}</div>
+        </td>`;
+
+        // Resumo das Jornadas cadastradas
+        let jornadasSummary = emp.jornadas.map((j, ji) => `<span class="text-[9px] bg-slate-100 px-1 rounded border border-slate-200">J${ji+1}: ${j.start}-${j.end}</span>`).join(' ');
+        tbodyHtml += `<td class="p-1 border border-slate-200 text-left leading-tight text-[10px]">
+          <div class="flex flex-wrap gap-0.5">${jornadasSummary}</div>
+        </td>`;
+
+        // Ciclo
+        tbodyHtml += `<td class="p-0.5 border border-slate-200 font-mono text-[9px] font-bold text-slate-600 text-center">
+          ${getCycleLabel(emp)}
+        </td>`;
+
+        let workedDaysCount = 0;
+
+        // Dias do mês
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(currentYear, currentMonth, day);
+          const dateStr = formatDateISO(date);
+          const dayData = getDayDataForDate(emp, date);
+          const status = dayData.status;
+          const info = statusInfo[status] || { name: status, style: 'bg-slate-100 text-slate-700' };
+          const shapeClass = getJornadaShapeClass(dayData.jornadaIdx);
+
+          usedStatuses.add(status);
+
+          if (['N', 'NP', 'HE'].includes(status)) {
+            workedDaysCount++;
+          }
+
+          let jBadge = (dayData.jornadaIdx > 0 && ['N', 'NP', 'HE'].includes(status)) ? `<span class="absolute bottom-0 right-0 text-[7px] bg-indigo-600 text-white px-0.5 rounded-tl">J${dayData.jornadaIdx+1}</span>` : '';
+
+          tbodyHtml += `<td onclick="openCellModal('${emp.id}', '${dateStr}', '${emp.code}', '${day}', '${status}', ${dayData.jornadaIdx})" 
+            class="p-0.5 border border-slate-200 cursor-pointer text-center select-none hover:opacity-80 transition relative">
+            <span class="day-badge w-5 h-5 mx-auto flex items-center justify-center text-[9px] sm:text-[10px] border ${info.style} ${shapeClass}">
+              ${status}
+            </span>
+            ${jBadge}
+          </td>`;
+        }
+
+        // Total no mês
+        tbodyHtml += `<td class="p-0.5 border border-slate-200 font-bold bg-slate-100 text-indigo-900 text-center text-[10px]">${workedDaysCount}</td>`;
+
+        tbodyHtml += `</tr>`;
+      });
+
+      tbodyHtml += `</tbody>`;
+      table.innerHTML += tbodyHtml;
+      
+      renderFooterLegend(usedStatuses);
+      renderFooterNotes();
+      lucide.createIcons();
+    }
+
+    // Renderizador das Legendas Utilizadas no Rodapé
+    function renderFooterLegend(usedStatuses) {
+      const container = document.getElementById('scaleLegendFooter');
+      container.innerHTML = "";
+
+      if (usedStatuses.size === 0) {
+        usedStatuses.add('N');
+        usedStatuses.add('F');
+      }
+
+      usedStatuses.forEach(code => {
+        const info = statusInfo[code];
+        if (info) {
+          container.innerHTML += `
+            <span class="inline-flex items-center gap-1 font-medium">
+              <span class="w-4 h-4 flex items-center justify-center rounded text-[9px] border ${info.style}">${code}</span>
+              <span>${info.name}</span>
+            </span>
+          `;
+        }
+      });
+    }
+
+    // Renderizador do Texto de Observações no Rodapé
+    function renderFooterNotes() {
+      const notes = document.getElementById('scaleNotes').value.trim();
+      const container = document.getElementById('displayScaleNotesContainer');
+      const textElem = document.getElementById('displayScaleNotes');
+
+      if (notes) {
+        textElem.innerText = notes;
+        container.classList.remove('hidden');
+      } else {
+        container.classList.add('hidden');
+      }
+    }
+
+    // Mini Lista
+    function renderMiniEmpList() {
+      const container = document.getElementById('empListMini');
+      container.innerHTML = "";
+
+      if (employees.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 italic">Nenhum empregado cadastrado.</p>`;
+        return;
+      }
+
+      employees.forEach(emp => {
+        container.innerHTML += `
+          <div class="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded text-xs">
+            <div>
+              <span class="font-bold text-slate-800">${emp.code}</span> - ${emp.name}
+              <div class="text-[10px] text-slate-500">${getCycleLabel(emp)} | ${emp.jornadas.length} jornada(s)</div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="editEmployee('${emp.id}')" type="button" class="text-indigo-600 hover:text-indigo-800 p-1"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+              <button onclick="deleteEmployee('${emp.id}')" type="button" class="text-red-600 hover:text-red-800 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function calculateMultiCycleTotal() {
+      let totalDays = 0;
+      for (let i = 1; i <= 6; i++) {
+        const val = document.getElementById(`cycleSub${i}`).value.trim().toLowerCase();
+        if (val) {
+          const parts = val.split('x');
+          if (parts.length === 2) {
+            totalDays += (parseInt(parts[0]) || 0) + (parseInt(parts[1]) || 0);
+          }
+        }
+      }
+      document.getElementById('totalCycleDays').innerText = `Total da Sequência: ${totalDays} dias`;
+    }
+
+    // Gerenciador dinâmico de Slots de Jornada no Modal de Empregado (Até 4)
+    function renderJornadasInputs(jornadasList = []) {
+      const container = document.getElementById('jornadasContainer');
+      container.innerHTML = "";
+
+      if (jornadasList.length === 0) {
+        jornadasList = [{ start: "07:00", lunchStart: "11:00", lunchEnd: "13:00", end: "17:00", duration: "8h" }];
+      }
+
+      jornadasList.forEach((j, i) => {
+        const shapeClass = getJornadaShapeClass(i);
+        const div = document.createElement('div');
+        div.className = "bg-slate-50 p-2.5 rounded-lg border border-slate-200 relative space-y-2";
+        div.innerHTML = `
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+              <span class="w-3.5 h-3.5 bg-indigo-600 text-white flex items-center justify-center text-[7px] ${shapeClass}">J${i+1}</span>
+              Jornada ${i+1}
+            </span>
+            ${i > 0 ? `<button type="button" onclick="removeJornadaSlot(${i})" class="text-red-600 hover:text-red-800 text-xs flex items-center gap-0.5"><i data-lucide="trash" class="w-3 h-3"></i> Remover</button>` : ''}
+          </div>
+          <div class="grid grid-cols-4 gap-1.5">
+            <div>
+              <label class="block text-[10px] text-slate-500">Início</label>
+              <input type="time" name="jStart" value="${j.start || '07:00'}" onchange="calcSlotDuration(this)" class="w-full text-xs border border-slate-300 rounded p-1">
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-500">Saída Alm.</label>
+              <input type="time" name="jLunchStart" value="${j.lunchStart || '11:00'}" onchange="calcSlotDuration(this)" class="w-full text-xs border border-slate-300 rounded p-1">
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-500">Volta Alm.</label>
+              <input type="time" name="jLunchEnd" value="${j.lunchEnd || '13:00'}" onchange="calcSlotDuration(this)" class="w-full text-xs border border-slate-300 rounded p-1">
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-500">Término</label>
+              <input type="time" name="jEnd" value="${j.end || '17:00'}" onchange="calcSlotDuration(this)" class="w-full text-xs border border-slate-300 rounded p-1">
+            </div>
+          </div>
+          <div class="flex justify-between items-center text-[11px] text-slate-600 pt-1 border-t border-slate-200">
+            <span>Duração calculada:</span>
+            <input type="text" name="jDuration" readonly value="${j.duration || '8h'}" class="w-16 text-center bg-white border border-slate-300 rounded text-xs font-bold text-indigo-700 py-0.5">
+          </div>
+        `;
+        container.appendChild(div);
+      });
+      lucide.createIcons();
+    }
+
+    function addJornadaSlot() {
+      const container = document.getElementById('jornadasContainer');
+      const currentSlots = container.children.length;
+      if (currentSlots >= 4) {
+        showAlert("Limite Atingido", "É permitido cadastrar até 4 jornadas distintas por empregado.");
+        return;
+      }
+
+      let list = collectCurrentJornadasForm();
+      list.push({ start: "13:00", lunchStart: "17:00", lunchEnd: "18:00", end: "22:00", duration: "8h" });
+      renderJornadasInputs(list);
+    }
+
+    function removeJornadaSlot(index) {
+      let list = collectCurrentJornadasForm();
+      list.splice(index, 1);
+      renderJornadasInputs(list);
+    }
+
+    function collectCurrentJornadasForm() {
+      const container = document.getElementById('jornadasContainer');
+      const slots = container.children;
+      let list = [];
+      for (let s of slots) {
+        list.push({
+          start: s.querySelector('[name="jStart"]').value,
+          lunchStart: s.querySelector('[name="jLunchStart"]').value,
+          lunchEnd: s.querySelector('[name="jLunchEnd"]').value,
+          end: s.querySelector('[name="jEnd"]').value,
+          duration: s.querySelector('[name="jDuration"]').value
+        });
+      }
+      return list;
+    }
+
+    function calcSlotDuration(inputElem) {
+      const slotBox = inputElem.closest('.bg-slate-50');
+      const start = slotBox.querySelector('[name="jStart"]').value;
+      const lunchStart = slotBox.querySelector('[name="jLunchStart"]').value;
+      const lunchEnd = slotBox.querySelector('[name="jLunchEnd"]').value;
+      const end = slotBox.querySelector('[name="jEnd"]').value;
+      const durInput = slotBox.querySelector('[name="jDuration"]');
+
+      if (start && lunchStart && lunchEnd && end) {
+        const t1 = new Date(`1970-01-01T${start}:00`);
+        const t2 = new Date(`1970-01-01T${lunchStart}:00`);
+        const t3 = new Date(`1970-01-01T${lunchEnd}:00`);
+        const t4 = new Date(`1970-01-01T${end}:00`);
+
+        const diff1 = (t2 - t1) / (1000 * 60 * 60);
+        const diff2 = (t4 - t3) / (1000 * 60 * 60);
+        const total = diff1 + diff2;
+
+        durInput.value = `${total.toFixed(1).replace('.0', '')}h`;
+      }
+    }
+
+    // Modal de Cadastro/Edição de Empregado
+    function openEmpModal(isEdit = false) {
+      if (!isEdit) {
+        if (employees.length >= 10) {
+          showAlert("Aviso", "O limite recomendado para visualização otimizada é de até 10 empregados.");
+        }
+        document.getElementById('empForm').reset();
+        document.getElementById('empId').value = "";
+        document.getElementById('empCode').value = `EMP_${employees.length + 1}`;
+        const startDateDefault = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+        document.getElementById('empMultiCycleStartDate').value = startDateDefault;
+        document.getElementById('cycleSub1').value = "6x2";
+        for (let i = 2; i <= 6; i++) {
+          document.getElementById(`cycleSub${i}`).value = "";
+        }
+        document.getElementById('empModalTitle').innerText = "Cadastrar Empregado";
+        renderJornadasInputs();
+        calculateMultiCycleTotal();
+      }
+      document.getElementById('empModal').classList.remove('hidden');
+    }
+
+    function closeEmpModal() {
+      document.getElementById('empModal').classList.add('hidden');
+    }
+
+    function saveEmployee(e) {
+      e.preventDefault();
+      const id = document.getElementById('empId').value || `emp_${Date.now()}`;
+      const code = document.getElementById('empCode').value;
+      const name = document.getElementById('empName').value;
+      const role = document.getElementById('empRole').value;
+      const jornadas = collectCurrentJornadasForm();
+
+      const cycleStartDate = document.getElementById('empMultiCycleStartDate').value;
+      let multiCycles = [];
+
+      for (let i = 1; i <= 6; i++) {
+        const val = document.getElementById(`cycleSub${i}`).value.trim().toUpperCase();
+        if (val) multiCycles.push(val);
+      }
+
+      const empData = { 
+        id, code, name, role, jornadas, 
+        multiCycles, cycleStartDate 
+      };
+
+      const existingIndex = employees.findIndex(emp => emp.id === id);
+      if (existingIndex >= 0) {
+        employees[existingIndex] = empData;
+      } else {
+        employees.push(empData);
+      }
+
+      closeEmpModal();
+      autoSaveCurrentData();
+      renderScale();
+    }
+
+    function editEmployee(id) {
+      const emp = employees.find(e => e.id === id);
+      if (!emp) return;
+
+      document.getElementById('empId').value = emp.id;
+      document.getElementById('empCode').value = emp.code;
+      document.getElementById('empName').value = emp.name;
+      document.getElementById('empRole').value = emp.role;
+
+      renderJornadasInputs(emp.jornadas || [{ start: "07:00", lunchStart: "11:00", lunchEnd: "13:00", end: "17:00", duration: "8h" }]);
+
+      document.getElementById('empMultiCycleStartDate').value = emp.cycleStartDate || `${currentYear}-08-01`;
+      for (let i = 1; i <= 6; i++) {
+        document.getElementById(`cycleSub${i}`).value = (emp.multiCycles && emp.multiCycles[i - 1]) ? emp.multiCycles[i - 1] : '';
+      }
+
+      calculateMultiCycleTotal();
+      document.getElementById('empModalTitle').innerText = "Editar Empregado";
+      document.getElementById('empModal').classList.remove('hidden');
+    }
+
+    function deleteEmployee(id) {
+      showConfirm("Deseja realmente remover este colaborador da escala?", function(confirmed) {
+        if (confirmed) {
+          employees = employees.filter(e => e.id !== id);
+          autoSaveCurrentData();
+          renderScale();
+        }
+      });
+    }
+
+    // Modal de Edição Diária Individual (Com alteração de Jornada e Status)
+    function openCellModal(empId, dateStr, empCode, dayNum, currentStatus, currentJornadaIdx) {
+      const emp = employees.find(e => e.id === empId);
+      if (!emp) return;
+
+      document.getElementById('cellEmpId').value = empId;
+      document.getElementById('cellDateStr').value = dateStr;
+      document.getElementById('cellModalTitle').innerText = `Alterar dia ${dayNum} - ${empCode}`;
+      document.getElementById('cellModalSubtitle').innerText = `Status Atual: ${currentStatus}`;
+
+      // Preenche o select de jornadas disponíveis do empregado
+      const selectJ = document.getElementById('cellJornadaSelect');
+      selectJ.innerHTML = "";
+      emp.jornadas.forEach((j, ji) => {
+        const opt = document.createElement('option');
+        opt.value = ji;
+        opt.text = `Jornada ${ji+1}: ${j.start} às ${j.end} (${j.duration})`;
+        if (ji === currentJornadaIdx) opt.selected = true;
+        selectJ.appendChild(opt);
+      });
+
+      document.getElementById('cellModal').classList.remove('hidden');
+    }
+
+    function closeCellModal() {
+      document.getElementById('cellModal').classList.add('hidden');
+    }
+
+    function updateDayStatus(newStatus) {
+      const empId = document.getElementById('cellEmpId').value;
+      const dateStr = document.getElementById('cellDateStr').value;
+      const jornadaIdx = parseInt(document.getElementById('cellJornadaSelect').value) || 0;
+      const key = `${empId}_${dateStr}`;
+
+      customOverrides[key] = { status: newStatus, jornadaIdx };
+
+      closeCellModal();
+      autoSaveCurrentData();
+      renderScale();
+    }
+
+    // Modal de Importação de Planilha
+    function openImportModal() {
+      document.getElementById('importModal').classList.remove('hidden');
+    }
+
+    function closeImportModal() {
+      document.getElementById('importModal').classList.add('hidden');
+    }
+
+    function loadSampleData() {
+      loadInitialEmployees();
+      customOverrides = {};
+      closeImportModal();
+      autoSaveCurrentData();
+      renderScale();
+    }
+
+    // Importação EXCLUSIVA de 3 Colunas: Matrícula, Nome, Cargo
+    function processImport() {
+      const text = document.getElementById('importRawText').value.trim();
+      if (!text) return;
+
+      const lines = text.split('\n');
+      const newEmps = [];
+      const defaultStartDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+
+      lines.forEach((line, i) => {
+        if (!line.trim()) return;
+
+        let cols = line.split(';').map(c => c.trim());
+        if (cols.length < 2) {
+          cols = line.split('\t').map(c => c.trim());
+        }
+        if (cols.length < 2) {
+          cols = line.split(',').map(c => c.trim());
+        }
+
+        if (cols.length >= 1) {
+          const code = cols[0] || `EMP_${i+1}`;
+          const name = cols[1] || `Empregado ${i+1}`;
+          const role = cols[2] || 'Função Padrão';
+
+          newEmps.push({
+            id: `imported_${Date.now()}_${i}`,
+            code,
+            name,
+            role,
+            jornadas: [{ start: "07:00", lunchStart: "11:00", lunchEnd: "13:00", end: "17:00", duration: "8h" }],
+            multiCycles: ["6x2"],
+            cycleStartDate: defaultStartDate
+          });
+        }
+      });
+
+      if (newEmps.length > 0) {
+        employees = newEmps;
+        customOverrides = {};
+        closeImportModal();
+        autoSaveCurrentData();
+        renderScale();
+      } else {
+        showAlert("Aviso de Formato", "Nenhum dado válido foi identificado. Certifique-se de colar no formato: MATRÍCULA ; NOME ; CARGO");
+      }
+    }
+
+    // Modal de Opções de Impressão / PDF
+    function triggerPrintPDF() {
+      document.getElementById('printPdfModal').classList.remove('hidden');
+    }
+
+    function closePrintPdfModal() {
+      document.getElementById('printPdfModal').classList.add('hidden');
+    }
+
+    // Opção 1: Geração direta de PDF
+    function downloadDirectPDF() {
+      closePrintPdfModal();
+      const element = document.getElementById('printableScaleArea');
+
+      element.classList.add('pdf-render-mode');
+
+      const opt = {
+        margin:       [3, 3, 3, 3],
+        filename:     `Escala_${monthNames[currentMonth]}_${currentYear}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, windowWidth: 1100 },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      };
+
+      html2pdf().set(opt).from(element).save().then(() => {
+        element.classList.remove('pdf-render-mode');
+        showAlert("Download Concluído", "O arquivo PDF da escala foi gerado com todos os dias do mês!");
+      }).catch(err => {
+        element.classList.remove('pdf-render-mode');
+        showAlert("Nota de Exportação", "Ocorreu um erro ao processar. Tente a opção 'Abrir em Nova Aba' para salvar diretamente pelo navegador.");
+      });
+    }
+
+    // Opção 2: Impressão do Navegador abrindo em nova janela limpa
+    function openPrintWindow() {
+      closePrintPdfModal();
+      const element = document.getElementById('printableScaleArea').outerHTML;
+      const printWindow = window.open('', '_blank');
+      
+      if (!printWindow) {
+        showAlert("Bloqueador de Pop-ups", "Por favor, permita pop-ups no navegador para abrir a janela de impressão.");
+        return;
+      }
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8">
+          <title>Escala Mensal - ${monthNames[currentMonth]} ${currentYear}</title>
+          <script src="https://cdn.tailwindcss.com"><\/script>
+          <style>
+            @page { size: A4 landscape; margin: 4mm; }
+            body { font-family: sans-serif; padding: 2px; margin: 0; }
+            table { font-size: 8px !important; width: 100% !important; table-layout: auto !important; }
+            th, td { padding: 1px 0.5px !important; }
+            .day-badge { width: 18px !important; height: 18px !important; font-size: 8px !important; }
+            .shape-j1 { border-radius: 2px; }
+            .shape-j2 { border-radius: 50%; }
+            .shape-j3 { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); border-radius: 0 !important; }
+            .shape-j4 { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); border-radius: 0 !important; }
+          </style>
+        </head>
+        <body onload="window.print();">
+          <div class="w-full mx-auto">
+            ${element}
+          </div>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+
+    // Gerador de conteúdo CSV
+    function generateCSVString() {
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      let csvRows = [];
+      
+      let header = ["Matricula", "Nome", "Cargo", "Jornadas", "Ciclo"];
+      for (let d = 1; d <= daysInMonth; d++) {
+        header.push(`Dia ${d}`);
+      }
+      csvRows.push(header.map(item => `"${item}"`).join(";"));
+
+      employees.forEach(emp => {
+        const jornadasDesc = emp.jornadas.map(j => `${j.start}-${j.end}`).join(" / ");
+        let row = [
+          emp.code,
+          emp.name,
+          emp.role,
+          jornadasDesc,
+          getCycleLabel(emp)
+        ];
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(currentYear, currentMonth, day);
+          const dayData = getDayDataForDate(emp, date);
+          let cellVal = dayData.status;
+          if (dayData.jornadaIdx > 0 && ['N', 'NP', 'HE'].includes(cellVal)) {
+            cellVal += `(J${dayData.jornadaIdx+1})`;
+          }
+          row.push(cellVal);
+        }
+
+        csvRows.push(row.map(item => `"${item}"`).join(";"));
+      });
+
+      const notes = document.getElementById('scaleNotes').value.trim();
+      if (notes) {
+        csvRows.push(`"Observacoes:";"${notes.replace(/"/g, '""')}"`);
+      }
+
+      return csvRows.join("\n");
+    }
+
+    // Exportação CSV com Fallback em Modal com Copia e Cola
+    function exportToCSV() {
+      const csvText = generateCSVString();
+      document.getElementById('csvTextArea').value = csvText;
+      document.getElementById('csvCopyStatus').classList.add('hidden');
+
+      try {
+        const csvBlob = new Blob(["\uFEFF" + csvText], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(csvBlob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Escala_${monthNames[currentMonth]}_${currentYear}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        // Silencioso se o browser barrar download direto
+      }
+
+      document.getElementById('csvExportModal').classList.remove('hidden');
+    }
+
+    function closeCSVModal() {
+      document.getElementById('csvExportModal').classList.add('hidden');
+    }
+
+    function copyCSVToClipboard() {
+      const textArea = document.getElementById('csvTextArea');
+      textArea.select();
+      textArea.setSelectionRange(0, 99999);
+      
+      try {
+        document.execCommand('copy');
+        document.getElementById('csvCopyStatus').classList.remove('hidden');
+        setTimeout(() => {
+          document.getElementById('csvCopyStatus').classList.add('hidden');
+        }, 3000);
+      } catch (err) {
+        showAlert("Cópia de Texto", "Selecione o texto da caixa e pressione Ctrl+C para copiar.");
+      }
+    }
+  </script>
+</body>
+</html>
+
