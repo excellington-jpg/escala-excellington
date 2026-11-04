@@ -599,7 +599,7 @@
       <h3 class="text-lg font-bold mb-1 text-white flex items-center gap-2">
         <i class="fa-solid fa-user text-indigo-400"></i> Identificação do Usuário
       </h3>
-      <p class="text-xs text-slate-400 mb-4">Informe seu nome para registrar o licenciamento de uso.</p>
+      <p class="text-xs text-slate-400 mb-4">Informe seu nome ou estabelecimento para iniciar:</p>
       <form onsubmit="handleUsernameSubmit(event)" class="space-y-3">
         <input type="text" id="register-username-input" required placeholder="Seu Nome ou Estabelecimento" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-indigo-500">
         <div class="flex gap-2 pt-2">
@@ -720,14 +720,18 @@
     function checkAppAccess() {
       const username = localStorage.getItem(USERNAME_KEY);
       const usernameModal = document.getElementById('username-modal');
+      const activationModal = document.getElementById('activation-modal');
 
-      if (!username) {
+      // 1. VERIFICAÇÃO PRIMÁRIA: Se não houver nome cadastrado, exibe obrigatoriamente a tela de identificação
+      if (!username || username.trim() === '') {
+        if (activationModal) activationModal.classList.add('hidden');
         document.getElementById('cancel-username-btn').classList.add('hidden');
         document.getElementById('register-username-input').value = '';
         if (usernameModal) usernameModal.classList.remove('hidden');
         return false;
       }
 
+      // Exibe o nome do usuário na interface
       const userTag = document.getElementById('user-display-tag');
       const editBtn = document.getElementById('edit-user-btn');
       if (userTag) {
@@ -736,6 +740,7 @@
       }
       if (editBtn) editBtn.classList.remove('hidden');
 
+      // 2. Validação da Licença / Expiração (somente para usuários já cadastrados)
       const expiration = readStoredExpiration();
       const now = Date.now();
 
@@ -805,23 +810,11 @@
       }
     }
 
-    function getRenewalTargetDate() {
-      const storedExpiration = readStoredExpiration();
-      const baseTime = (storedExpiration !== null && storedExpiration > Date.now()) 
-        ? storedExpiration 
-        : Date.now();
-
-      const targetDate = new Date(baseTime + (30 * 24 * 60 * 60 * 1000));
-      targetDate.setHours(23, 59, 59, 999);
-      return targetDate;
-    }
-
     function updateActivationInfo() {
       const username = localStorage.getItem(USERNAME_KEY) || 'Não cadastrado';
       const userEl = document.getElementById('activation-display-username');
       if (userEl) userEl.textContent = username;
 
-      // Exibe exatamente a data real em que expirou (sem somar dias)
       const storedExpiration = readStoredExpiration();
       const expDate = storedExpiration ? new Date(storedExpiration) : new Date();
 
@@ -854,7 +847,6 @@
       const cleanName = username.replace(/\s+/g, '');
       const charCount = cleanName.length;
 
-      // Utiliza estritamente a data de expiração atualmente armazenada
       const storedExpiration = readStoredExpiration();
       if (!storedExpiration) {
         alert("Data de expiração não encontrada.");
@@ -870,7 +862,6 @@
       const expectedCode = String(Math.pow(baseSum, 3));
 
       if (codeInput === expectedCode || codeInput === "1234567890") {
-        // Calcula a nova data de expiração (30 dias a partir de agora ou da expiração anterior)
         const baseTime = storedExpiration > Date.now() ? storedExpiration : Date.now();
         const targetDate = new Date(baseTime + (30 * 24 * 60 * 60 * 1000));
         targetDate.setHours(23, 59, 59, 999);
@@ -918,10 +909,9 @@
     let currentYear = 2026;
     let currentMonth = 7; // Agosto (0 = Jan)
     let employees = [];
-    let customOverrides = {}; // Registro de substituições de dias individuais
+    let customOverrides = {}; 
     let confirmCallback = null;
 
-    // Persistência local e modelos de escalas criadas
     const STORAGE_CURRENT = 'geradorEscalaPermanent_current_v1';
     const STORAGE_SCALES = 'geradorEscalaPermanent_scales_v1';
     let savedScales = [];
@@ -1068,7 +1058,6 @@
       showAlert('Próxima escala criada', `A escala de ${monthNames[currentMonth]} de ${currentYear} foi calculada com base na sequência cadastrada de cada empregado.`);
     }
 
-    // Mapeamento de estilização e descrição das siglas
     const statusInfo = {
       'N':  { name: 'Normal', style: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold' },
       'F':  { name: 'Folga', style: 'bg-slate-200 text-slate-600 border-slate-300' },
